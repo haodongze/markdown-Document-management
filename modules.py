@@ -374,12 +374,12 @@ class dropboxInteractor(object):
 
 
 def note_modified(pattern_recog, md_file, **replace_dict):
-    with open(md_file, 'r') as f:
+    with open(md_file, 'r',encoding='utf-8') as f:
         content = f.read()
     
     replaced_content = pattern_recog.multiple_replace(content, **replace_dict)
 
-    with open(md_file, 'w') as f:
+    with open(md_file, 'w',encoding='utf-8') as f:
         f.write(''.join(replaced_content))
 
 
