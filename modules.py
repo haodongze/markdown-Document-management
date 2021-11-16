@@ -163,7 +163,7 @@ class metaExtracter(object):
                 journal = "arxiv"
                 published = item.published.split("-")
                 if len(published) > 1:
-                    year = published[0]
+                    year = published[0]+'.'+published[1]
                 else: 
                     year = ' '
                 
