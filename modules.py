@@ -119,7 +119,7 @@ class metaExtracter(object):
             # return bib_database.entries[0]
             bib = r.json()['message']
             pub_date = [str(i) for i in bib['published']["date-parts"][0]]
-            pub_date = '-'.join(pub_date)
+            pub_date = '.'.join(pub_date)
 
             authors = ' and '.join([i["family"]+" "+i['given'] for i in bib['author'] if "family" and "given" in i.keys()])
 
