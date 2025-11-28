@@ -150,41 +150,31 @@ class metaExtracter(object):
         try:
             result = feedparser.parse(bare_url + params)
             items = result.entries
-            # found = len(items) > 0
-
+            if not items:
+                logger.info("arXiv: %s not found", aid); return None
             item = items[0]
-            # if found:
+    
+            # 先构造 arXiv 元数据
+            paper_url = item.link
+            title = item.title
+            journal = "arXiv"
+            published = (item.published or "").split("-")
+            year = (published[0]+'.'+published[1]) if len(published) > 1 else ''
+            authors = " and ".join([a.get("name","") for a in (item.authors or [])])
+    
+            bib_dict = {
+                "journal": journal, "url": paper_url, "title": title,
+                "year": year, "author": authors, "ENTRYTYPE": "article"
+            }
+    
+            # 如果条目带 DOI，可再尝试补全；失败则保留 arXiv 信息
             if "arxiv_doi" in item:
-                doi = item["arxiv_doi"]
-                bib_dict = self.doi2bib(doi)
-            else:
-                paper_url = item.link 
-                title = item.title
-                journal = "arxiv"
-                published = item.published.split("-")
-                if len(published) > 1:
-                    year = published[0]+'.'+published[1]
-                else: 
-                    year = ' '
-                
-                authors = item.authors
-                if len(authors) > 0:
-                    first_author = authors[0]["name"].split(" ")
-                    authors = " and ".join([author["name"] for author in authors])
-                else:
-                    first_author = authors
-                    authors = authors
-
-                bib_dict = {
-                    "journal": journal,
-                    "url": paper_url,
-                    "title": title,
-                    "year": year,
-                    "author": authors,
-                    "ENTRYTYPE": "article"
-                }
-
+                doi_bib = self.doi2bib(item["arxiv_doi"])
+                if doi_bib:
+                    bib_dict.update({k:v for k,v in doi_bib.items() if v})
             return bib_dict 
+        except:
+            logger.info("DOI: {} is error.".format(arxivId))
         except:
             logger.info("DOI: {} is error.".format(arxivId))
 
