@@ -97,20 +97,21 @@ class metaExtracter(object):
         arxivId - arxivId
         doi - digital object identifier
         """
-        if self.check_string(r'10\.[0-9]{4}/.*', identifier):
+        if self.check_string(r'^10\.[0-9]{4,9}/\S+$', identifier):
             return 'doi'
         else:
             return 'arxivId'
 
     def doi2bib(self, doi):
-        bare_url = "http://api.crossref.org/"
+        bare_url = "https://api.crossref.org/"
         # url = "{}works/{}/transform/application/x-bibtex"
         # TODO: url cannot return journal name
         url = "{}works/{}"
         url = url.format(bare_url, doi)
         
         try:
-            r = requests.get(url)
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
             # found = False if r.status_code != 200 else True
             # bib = str(r.content, "utf-8")
 
@@ -139,20 +140,34 @@ class metaExtracter(object):
             }
             
             return bib_dict
-        except:
-            logger.info("DOI: {} is error.".format(doi))
+        except Exception as exc:
+            logger.warning("DOI: %s metadata lookup failed: %s", doi, exc)
+            return None
 
     def arxivId2bib(self, arxivId):
-        bare_url = "http://export.arxiv.org/api/query"
-
-        params = "?search_query=id:"+quote(unidecode(arxivId))
+        bare_url = "https://export.arxiv.org/api/query"
         
         try:
-            result = feedparser.parse(bare_url + params)
+            response = requests.get(
+                bare_url, params={"id_list": arxivId}, timeout=30
+            )
+            response.raise_for_status()
+            result = feedparser.parse(response.content)
+            if result.get("bozo"):
+                raise ValueError("Invalid arXiv Atom response: {}".format(
+                    result.get("bozo_exception", "parse error")))
+            if result.get("version") != "atom10":
+                raise ValueError("Expected an arXiv Atom feed; received a non-Atom response")
             items = result.entries
             if not items:
-                logger.info("arXiv: %s not found", aid); return None
+                logger.info("arXiv: %s not found", arxivId)
+                return None
             item = items[0]
+            if item.get("id", "").startswith(("http://arxiv.org/api/errors",
+                                              "https://arxiv.org/api/errors")):
+                logger.warning("arXiv: %s API error: %s", arxivId,
+                               item.get("summary", item.get("title", "unknown error")))
+                return None
     
             # 先构造 arXiv 元数据
             paper_url = item.link
@@ -172,11 +187,10 @@ class metaExtracter(object):
                 doi_bib = self.doi2bib(item["arxiv_doi"])
                 if doi_bib:
                     bib_dict.update({k:v for k,v in doi_bib.items() if v})
-            return bib_dict 
-        except:
-            logger.info("DOI: {} is error.".format(arxivId))
-        except:
-            logger.info("DOI: {} is error.".format(arxivId))
+            return bib_dict
+        except Exception as exc:
+            logger.warning("arXiv: %s metadata lookup failed: %s", arxivId, exc)
+            return None
 
     def id2bib(self, identifier):
         id_type = self._classify(identifier)
